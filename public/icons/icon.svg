@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 700" role="img" aria-labelledby="title desc">
+  <title id="title">Кристал Сервіс</title>
+  <desc id="desc">Логотип Кристал Сервіс</desc>
+  <g fill="#08469B">
+    <path d="M352 55L435 78L431 330L390 370L337 330Z"/>
+    <path d="M250 150L315 123L328 335L291 361L258 320Z"/>
+    <path d="M155 300L213 277L296 365L270 405L205 376Z"/>
+    <path d="M445 330L516 286L548 324L485 392L448 370Z"/>
+    <path d="M532 343L615 330L646 369L526 397L493 376Z"/>
+    <path d="M133 350L198 342L265 403L226 424L137 394Z"/>
+    <path d="M235 400L310 365L365 411L313 449Z"/>
+    <path d="M382 407L431 365L499 404L460 448Z"/>
+    <path d="M180 420L287 445L400 430L520 445L613 417L568 472L400 492L224 470Z"/>
+  </g>
+  <g fill="#FFFFFF">
+    <path d="M366 88L400 98L397 315L375 340Z"/>
+    <path d="M273 169L297 159L306 315L290 334Z"/>
+    <path d="M175 321L199 312L267 371L248 383Z"/>
+    <path d="M473 337L516 314L535 333L489 367Z"/>
+  </g>
+  <g stroke="#08469B" stroke-width="9" stroke-linecap="round" fill="none">
+    <path d="M400 365V442"/>
+    <path d="M362 386L438 429"/>
+    <path d="M438 386L362 429"/>
+    <path d="M382 375L367 360"/>
+    <path d="M418 375L433 360"/>
+    <path d="M382 432L367 447"/>
+    <path d="M418 432L433 447"/>
+  </g>
+  <text x="400" y="555" text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="47" font-weight="700"
+        letter-spacing="0.5" fill="#08469B">КРИСТАЛ СЕРВІС</text>
+</svg>
