@@ -533,14 +533,30 @@ body {
     transparent 0.7px
   );
   background-size: 12px 12px;
-  touch-action: pan-y;
+  touch-action: none;
 }
-.pdf-page {
-  display: block;
-  max-width: 100%;
+.flipbook-host,
+.flipbook-book {
+  width: 100%;
+  height: 100%;
+}
+.flipbook-host {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.flipbook-page {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
   background: #fff;
-  box-shadow: 0 8px 26px rgba(18, 30, 20, 0.22);
-  animation: page-arrive 0.22s ease-out;
+}
+.flipbook-page img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #fff;
 }
 .reader-message {
   padding: 20px;

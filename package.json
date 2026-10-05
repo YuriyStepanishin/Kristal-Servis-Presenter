@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
+    "page-flip": "^2.0.7",
     "pdfjs-dist": "^6.4.299",
     "react": "latest",
     "react-dom": "latest",

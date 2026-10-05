@@ -1,8 +1,10 @@
-import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
-import type { ReactNode, TouchEvent } from "react";
+import type { PDFDocumentProxy } from "pdfjs-dist";
+import type { ReactNode } from "react";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { useEffect, useRef, useState } from "react";
+import { PageFlip } from "page-flip";
 import type { CatalogPage } from "./App";
+import SlideNavigation from "./SlideNavigation";
 
 type PdfReaderProps = {
   /**
@@ -52,99 +54,16 @@ export default function PdfReader({
   onSelectedPageChange,
   navigationPanel,
 }: PdfReaderProps) {
-  const [document, setDocument] = useState<PDFDocumentProxy | null>(null);
-
-  const [loadedFile, setLoadedFile] = useState<string | null>(null);
-
-  /**
-   * Позиція всередині дозволеного набору.
-   *
-   * Наприклад:
-   *
-   * pages:
-   * [
-   *   id 101 → page 25
-   *   id 102 → page 26
-   *   id 103 → page 28
-   * ]
-   *
-   * pageIndex = 0 → PDF 25
-   * pageIndex = 1 → PDF 26
-   * pageIndex = 2 → PDF 28
-   */
   const [pageIndex, setPageIndex] = useState(0);
-
-  const [stageSize, setStageSize] = useState({
-    width: 0,
-    height: 0,
-  });
-
   const [error, setError] = useState("");
+  const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
 
   const stageRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  const touchStart = useRef<{
-    x: number;
-    y: number;
-  } | null>(null);
-
-  /**
-   * Реальна сторінка PDF.
-   *
-   * ВАЖЛИВО:
-   * використовуємо саме `page`,
-   * а не `id` і не `source_page`.
-   */
-  const currentCatalogPage = pages[pageIndex];
-
-  const pdfPageNumber = currentCatalogPage?.page;
-
-  // ==================================================
-  // ЗАВАНТАЖЕННЯ PDF
-  // ==================================================
-
-  useEffect(() => {
-    let cancelled = false;
-
-    let destroyLoadingTask: (() => Promise<void>) | undefined;
-
-    setDocument(null);
-    setLoadedFile(null);
-    setError("");
-
-    void import("pdfjs-dist")
-      .then(({ GlobalWorkerOptions, getDocument }) => {
-        if (cancelled) return;
-
-        GlobalWorkerOptions.workerSrc = workerUrl;
-
-        const loadingTask = getDocument({
-          url: file,
-        });
-
-        destroyLoadingTask = () => loadingTask.destroy();
-
-        return loadingTask.promise.then((pdf) => {
-          if (!cancelled) {
-            setDocument(pdf);
-            setLoadedFile(file);
-          }
-        });
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setError(
-            "Не вдалося завантажити цей каталог. Перевірте наявність PDF-файлу.",
-          );
-        }
-      });
-
-    return () => {
-      cancelled = true;
-      void destroyLoadingTask?.();
-    };
-  }, [file]);
+  const bookHostRef = useRef<HTMLDivElement>(null);
+  const pageFlipRef = useRef<PageFlip | null>(null);
+  const renderNearbyRef = useRef<((index: number) => void) | null>(null);
+  const pdfCacheRef = useRef(new Map<string, Promise<PDFDocumentProxy>>());
+  const renderedPagesRef = useRef(new Map<string, string>());
 
   // ==================================================
   // СИНХРОНІЗАЦІЯ З selectedPage
@@ -160,6 +79,10 @@ export default function PdfReader({
 
     if (index >= 0) {
       setPageIndex(index);
+      if (pageFlipRef.current?.getCurrentPageIndex() !== index) {
+        pageFlipRef.current?.turnToPage(index);
+      }
+      renderNearbyRef.current?.(index);
       return;
     }
 
@@ -172,10 +95,6 @@ export default function PdfReader({
 
     onSelectedPageChange(pages[0].id);
   }, [pages, selectedPage, onSelectedPageChange]);
-
-  // ==================================================
-  // RESIZE
-  // ==================================================
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -194,92 +113,146 @@ export default function PdfReader({
     return () => observer.disconnect();
   }, []);
 
-  // ==================================================
-  // МАЛЮВАННЯ PDF
-  // ==================================================
-
   useEffect(() => {
-    if (
-      !document ||
-      loadedFile !== file ||
-      !canvasRef.current ||
-      !stageSize.width ||
-      !stageSize.height ||
-      !pdfPageNumber
-    ) {
+    const host = bookHostRef.current;
+
+    if (!host || !stageSize.width || !stageSize.height || !pages.length) {
       return;
     }
 
     let cancelled = false;
-    let renderTask: RenderTask | undefined;
+    const initialIndex = Math.max(
+      0,
+      pages.findIndex((page) => page.id === selectedPage),
+    );
+    const pageWidth = Math.floor(
+      Math.min(stageSize.width, stageSize.height * 0.707),
+    );
+    const pageHeight = Math.floor(pageWidth / 0.707);
+    const book = document.createElement("div");
+    const pageElements = pages.map((page) => {
+      const element = document.createElement("div");
+      const image = document.createElement("img");
+      const cacheKey = `${page.file}:${page.page}`;
 
-    document
-      .getPage(pdfPageNumber)
-      .then((pdfPage) => {
-        if (cancelled || !canvasRef.current) {
-          return;
+      element.className = "flipbook-page";
+      element.dataset.pageId = String(page.id);
+      element.setAttribute("aria-label", `Сторінка PDF ${page.page}`);
+      image.alt = `Сторінка ${page.page}`;
+      image.draggable = false;
+      image.dataset.cacheKey = cacheKey;
+      element.append(image);
+
+      const cachedImage = renderedPagesRef.current.get(cacheKey);
+      if (cachedImage) image.src = cachedImage;
+
+      return element;
+    });
+    const images = pageElements.map((element) => element.querySelector("img")!);
+
+    book.className = "flipbook-book";
+    book.style.width = `${pageWidth}px`;
+    book.style.height = `${pageHeight}px`;
+    host.replaceChildren(book);
+    setError("");
+
+    async function renderPage(index: number) {
+      const page = pages[index];
+      const image = images[index];
+      if (
+        !page ||
+        !image ||
+        renderedPagesRef.current.has(image.dataset.cacheKey!)
+      ) {
+        return;
+      }
+
+      try {
+        let pdfPromise = pdfCacheRef.current.get(page.file);
+        if (!pdfPromise) {
+          pdfPromise = import("pdfjs-dist").then(
+            ({ GlobalWorkerOptions, getDocument }) => {
+              GlobalWorkerOptions.workerSrc = workerUrl;
+              return getDocument({ url: page.file }).promise;
+            },
+          );
+          pdfCacheRef.current.set(page.file, pdfPromise);
         }
 
-        const naturalViewport = pdfPage.getViewport({
-          scale: 1,
-        });
+        const pdf = await pdfPromise;
+        const pdfPage = await pdf.getPage(page.page);
+        if (cancelled) return;
 
+        const naturalViewport = pdfPage.getViewport({ scale: 1 });
         const scale = Math.min(
-          stageSize.width / naturalViewport.width,
-          stageSize.height / naturalViewport.height,
+          pageWidth / naturalViewport.width,
+          pageHeight / naturalViewport.height,
         );
-
-        const viewport = pdfPage.getViewport({
-          scale,
-        });
-
-        const canvas = canvasRef.current;
-
+        const viewport = pdfPage.getViewport({ scale });
+        const canvas = window.document.createElement("canvas");
         const context = canvas.getContext("2d");
+        if (!context) return;
 
-        if (!canvas || !context) {
-          return;
-        }
-
-        const outputScale = window.devicePixelRatio || 1;
-
+        const outputScale = Math.min(window.devicePixelRatio || 1, 2);
         canvas.width = Math.floor(viewport.width * outputScale);
-
         canvas.height = Math.floor(viewport.height * outputScale);
-
-        canvas.style.setProperty(
-          "width",
-          `${Math.floor(viewport.width)}px`,
-          "important",
-        );
-
-        canvas.style.setProperty(
-          "height",
-          `${Math.floor(viewport.height)}px`,
-          "important",
-        );
-
         context.setTransform(outputScale, 0, 0, outputScale, 0, 0);
+        await pdfPage.render({ canvas, canvasContext: context, viewport })
+          .promise;
 
-        renderTask = pdfPage.render({
-          canvas,
-          canvasContext: context,
-          viewport,
-        });
+        if (cancelled) return;
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.88);
+        renderedPagesRef.current.set(image.dataset.cacheKey!, dataUrl);
+        image.src = dataUrl;
+      } catch {
+        if (!cancelled)
+          setError("Не вдалося завантажити або відобразити сторінку PDF.");
+      }
+    }
 
-        return renderTask.promise;
-      })
-      .catch((reason) => {
-        if (!cancelled && reason?.name !== "RenderingCancelledException") {
-          setError("Не вдалося відобразити сторінку PDF.");
-        }
+    function renderNearby(index: number) {
+      for (let offset = -2; offset <= 2; offset += 1) {
+        void renderPage(index + offset);
+      }
+    }
+
+    try {
+      const pageFlip = new PageFlip(book, {
+        width: pageWidth,
+        height: pageHeight,
+        size: "fixed",
+        startPage: initialIndex,
+        showCover: false,
+        usePortrait: true,
+        flippingTime: 650,
+        maxShadowOpacity: 0.24,
+        mobileScrollSupport: false,
+        autoSize: false,
       });
+
+      pageFlip.on("flip", ({ data }) => {
+        if (cancelled || typeof data !== "number") return;
+        const nextPage = pages[data];
+        if (!nextPage) return;
+        setPageIndex(data);
+        onSelectedPageChange(nextPage.id);
+        renderNearby(data);
+      });
+      pageFlip.loadFromHTML(pageElements);
+      pageFlipRef.current = pageFlip;
+      renderNearbyRef.current = renderNearby;
+      renderNearby(initialIndex);
+    } catch {
+      setError("Не вдалося запустити перегортання сторінок.");
+    }
 
     return () => {
       cancelled = true;
-      renderTask?.cancel();
+      pageFlipRef.current?.destroy();
+      pageFlipRef.current = null;
+      renderNearbyRef.current = null;
     };
-  }, [document, file, loadedFile, pdfPageNumber, stageSize]);
+  }, [pages, stageSize.height, stageSize.width, onSelectedPageChange]);
 
   // ==================================================
   // ПЕРЕГОРТАННЯ
@@ -295,16 +268,17 @@ export default function PdfReader({
     if (!nextPage) return;
 
     setPageIndex(safeIndex);
-
     onSelectedPageChange(nextPage.id);
+    renderNearbyRef.current?.(safeIndex);
+    pageFlipRef.current?.turnToPage(safeIndex);
   }
 
   function goNext() {
-    goToIndex(pageIndex + 1);
+    pageFlipRef.current?.flipNext();
   }
 
   function goPrevious() {
-    goToIndex(pageIndex - 1);
+    pageFlipRef.current?.flipPrev();
   }
 
   // ==================================================
@@ -337,36 +311,6 @@ export default function PdfReader({
   }, [pageIndex, pages]);
 
   // ==================================================
-  // СВАЙП
-  // ==================================================
-
-  function handleTouchEnd(event: TouchEvent<HTMLDivElement>) {
-    const start = touchStart.current;
-
-    touchStart.current = null;
-
-    if (!start) return;
-
-    const touch = event.changedTouches[0];
-
-    if (!touch) return;
-
-    const deltaX = touch.clientX - start.x;
-
-    const deltaY = touch.clientY - start.y;
-
-    if (Math.abs(deltaX) < 48 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) {
-      return;
-    }
-
-    if (deltaX < 0) {
-      goNext();
-    } else {
-      goPrevious();
-    }
-  }
-
-  // ==================================================
   // НЕМАЄ СТОРІНОК
   // ==================================================
 
@@ -391,37 +335,23 @@ export default function PdfReader({
 
   return (
     <section className="reader-panel" aria-label={`Перегляд каталогу ${title}`}>
-      <div
-        className="reader-stage"
-        ref={stageRef}
-        onTouchStart={(event) => {
-          const touch = event.touches[0];
-
-          if (!touch) return;
-
-          touchStart.current = {
-            x: touch.clientX,
-            y: touch.clientY,
-          };
-        }}
-        onTouchEnd={handleTouchEnd}
-      >
+      <div className="reader-stage" ref={stageRef}>
         {error ? (
           <div className="reader-message" role="alert">
             {error}
           </div>
-        ) : !document ? (
+        ) : !stageSize.width ? (
           <div className="reader-message">Завантаження каталогу…</div>
         ) : (
-          <canvas
-            className="pdf-page"
-            ref={canvasRef}
-            key={`${file}-${pdfPageNumber}`}
-            aria-label={`Сторінка PDF ${pdfPageNumber}`}
-          />
+          <div className="flipbook-host" ref={bookHostRef} />
         )}
       </div>
 
+      <SlideNavigation
+        page={pageIndex + 1}
+        pageCount={pages.length}
+        onPageChange={(page) => goToIndex(page - 1)}
+      />
       {navigationPanel}
     </section>
   );
