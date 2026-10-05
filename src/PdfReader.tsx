@@ -224,7 +224,10 @@ export default function PdfReader({
           scale: 1,
         });
 
-        const scale = stageSize.height / naturalViewport.height;
+        const scale = Math.min(
+          stageSize.width / naturalViewport.width,
+          stageSize.height / naturalViewport.height,
+        );
 
         const viewport = pdfPage.getViewport({
           scale,
