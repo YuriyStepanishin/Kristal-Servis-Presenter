@@ -1,11 +1,11 @@
 {
   "name": "Кристал Сервіс Presenter",
-  "short_name": "КСП",
+  "short_name": "Кристал Сервіс Presenter",
   "description": "Електронний презентатор каталогів Кристал Сервіс",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "orientation": "landscape",
+  "orientation": "portrait",
   "background_color": "#07120e",
   "theme_color": "#10261d",
   "lang": "uk",

@@ -1,4 +1,4 @@
-const CACHE_NAME = "laska-presenter-v2";
+const CACHE_NAME = "laska-presenter-v3";
 const APP_SHELL = ["./", "./index.html", "./manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
