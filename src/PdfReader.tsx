@@ -247,9 +247,17 @@ export default function PdfReader({
 
         canvas.height = Math.floor(viewport.height * outputScale);
 
-        canvas.style.width = `${Math.floor(viewport.width)}px`;
+        canvas.style.setProperty(
+          "width",
+          `${Math.floor(viewport.width)}px`,
+          "important",
+        );
 
-        canvas.style.height = `${Math.floor(viewport.height)}px`;
+        canvas.style.setProperty(
+          "height",
+          `${Math.floor(viewport.height)}px`,
+          "important",
+        );
 
         context.setTransform(outputScale, 0, 0, outputScale, 0, 0);
 

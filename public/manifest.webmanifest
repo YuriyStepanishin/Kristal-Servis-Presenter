@@ -1,6 +1,6 @@
 {
   "name": "Кристал Сервіс Presenter",
-  "short_name": "Кристал Сервіс Presenter",
+  "short_name": "KS Presenter",
   "description": "Електронний презентатор каталогів Кристал Сервіс",
   "start_url": "./",
   "scope": "./",
