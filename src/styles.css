@@ -546,10 +546,26 @@ body {
   overflow: hidden;
 }
 .flipbook-page {
+  position: relative;
   display: grid;
   place-items: center;
   overflow: hidden;
   background: #fff;
+}
+.flipbook-page.is-loading::after {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border: 3px solid #dfe3dc;
+  border-top-color: #37644a;
+  border-radius: 50%;
+  content: "";
+  animation: page-loader-spin 0.8s linear infinite;
+}
+@keyframes page-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .flipbook-page img {
   display: block;

@@ -20,15 +20,15 @@ function unique(values: string[]) {
   return Array.from(new Set(values));
 }
 
-export default function App() {
-  const catalogs = (catalog.pages as Omit<CatalogPage, "id" | "sheet">[]).map(
-    (item, index) => ({
-      ...item,
-      id: index + 1,
-      sheet: item.source_page,
-    }),
-  );
+const catalogs: CatalogPage[] = (
+  catalog.pages as Omit<CatalogPage, "id" | "sheet">[]
+).map((item, index) => ({
+  ...item,
+  id: index + 1,
+  sheet: item.source_page,
+}));
 
+export default function App() {
   // --------------------------------------------------
   // СТАН
   // --------------------------------------------------

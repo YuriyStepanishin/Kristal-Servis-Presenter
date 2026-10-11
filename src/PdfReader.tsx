@@ -135,7 +135,7 @@ export default function PdfReader({
       const image = document.createElement("img");
       const cacheKey = `${page.file}:${page.page}`;
 
-      element.className = "flipbook-page";
+      element.className = "flipbook-page is-loading";
       element.dataset.pageId = String(page.id);
       element.setAttribute("aria-label", `Сторінка PDF ${page.page}`);
       image.alt = `Сторінка ${page.page}`;
@@ -144,7 +144,10 @@ export default function PdfReader({
       element.append(image);
 
       const cachedImage = renderedPagesRef.current.get(cacheKey);
-      if (cachedImage) image.src = cachedImage;
+      if (cachedImage) {
+        image.src = cachedImage;
+        element.classList.remove("is-loading");
+      }
 
       return element;
     });
@@ -204,16 +207,22 @@ export default function PdfReader({
         const dataUrl = canvas.toDataURL("image/jpeg", 0.88);
         renderedPagesRef.current.set(image.dataset.cacheKey!, dataUrl);
         image.src = dataUrl;
+        image.parentElement?.classList.remove("is-loading");
       } catch {
+        image.parentElement?.classList.remove("is-loading");
         if (!cancelled)
           setError("Не вдалося завантажити або відобразити сторінку PDF.");
       }
     }
 
     function renderNearby(index: number) {
-      for (let offset = -2; offset <= 2; offset += 1) {
-        void renderPage(index + offset);
-      }
+      void renderPage(index).then(() => {
+        if (cancelled) return;
+
+        for (let offset = -2; offset <= 2; offset += 1) {
+          if (offset !== 0) void renderPage(index + offset);
+        }
+      });
     }
 
     try {
