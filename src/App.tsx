@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import CatalogNavigation from "./CatalogNavigation";
 import PdfReader from "./PdfReader";
 import catalog from "./catalog.json";
+import { useOfflinePreload } from "./useOfflinePreload";
 
 export type CatalogPage = {
   id: number;
@@ -28,7 +29,10 @@ const catalogs: CatalogPage[] = (
   sheet: item.source_page,
 }));
 
+const catalogFiles = unique(catalogs.map((item) => item.file));
+
 export default function App() {
+  const preload = useOfflinePreload(catalogFiles);
   // --------------------------------------------------
   // СТАН
   // --------------------------------------------------
@@ -173,6 +177,18 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      {preload.supported && preload.total > 0 && (
+        <div
+          className={`offline-status${preload.ready ? " is-ready" : ""}`}
+          role="status"
+        >
+          {preload.ready
+            ? "Готово для офлайн-режиму"
+            : `Завантажено ${preload.done} з ${preload.total} каталогів${
+                preload.failed ? ` (помилок: ${preload.failed})` : ""
+              }`}
+        </div>
+      )}
       <main className="main-area">
         {currentPage ? (
           <PdfReader
